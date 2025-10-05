@@ -159,56 +159,98 @@ class SITLInstance:
         logger.info(f"Configuring PX4 MAVLink for instance {self.instance_id}...")
         
         try:
-            # For multi-instance setup, we'll use a simpler approach
-            # PX4 SITL with Gazebo should automatically connect to the MAVLink router
-            # The MAVLink router is already listening on self.udp_port
-            # We just need to ensure PX4 is configured to send MAVLink messages
-            
-            # Wait for PX4 to fully start
-            time.sleep(8)
+            # Wait longer for PX4 to fully start and stabilize
+            logger.info(f"Waiting for PX4 to stabilize for instance {self.instance_id}...")
+            time.sleep(10)
             
             mavlink_shell = os.path.join(self.px4_path, "Tools", "mavlink_shell.py")
             
-            # Try to configure MAVLink, but don't fail if it doesn't work
-            # PX4 SITL with Gazebo should work without explicit MAVLink configuration
+            if not os.path.exists(mavlink_shell):
+                logger.warning(f"MAVLink shell not found at {mavlink_shell}, skipping configuration")
+                return True
+            
+            # Try multiple times to configure MAVLink
+            for attempt in range(3):
+                try:
+                    logger.info(f"MAVLink configuration attempt {attempt + 1} for instance {self.instance_id}...")
+                    
+                    # First, check if we can connect to PX4
+                    test_result = subprocess.run(
+                        ['python3', mavlink_shell, f'udp:127.0.0.1:{self.udp_port}'],
+                        input="status\n",
+                        text=True,
+                        capture_output=True,
+                        timeout=10
+                    )
+                    
+                    if test_result.returncode != 0:
+                        logger.warning(f"Could not connect to PX4 on attempt {attempt + 1}, retrying...")
+                        time.sleep(5)
+                        continue
+                    
+                    # Now configure MAVLink with correct target address
+                    result = subprocess.run(
+                        ['python3', mavlink_shell, f'udp:127.0.0.1:{self.udp_port}'],
+                        input=f"mavlink start -x -u {self.udp_port} -r 4000000 -t 127.0.0.1\n",
+                        text=True,
+                        capture_output=True,
+                        timeout=20
+                    )
+                    
+                    if result.returncode == 0:
+                        logger.info(f"✅ MAVLink configured successfully for instance {self.instance_id}")
+                        
+                        # Verify the configuration
+                        time.sleep(2)
+                        verify_result = subprocess.run(
+                            ['python3', mavlink_shell, f'udp:127.0.0.1:{self.udp_port}'],
+                            input="mavlink status\n",
+                            text=True,
+                            capture_output=True,
+                            timeout=10
+                        )
+                        
+                        if verify_result.returncode == 0:
+                            logger.info(f"✅ MAVLink status verified for instance {self.instance_id}")
+                            return True
+                        else:
+                            logger.warning(f"⚠️ MAVLink status verification failed for instance {self.instance_id}")
+                    
+                    else:
+                        logger.warning(f"⚠️ MAVLink configuration failed on attempt {attempt + 1}: {result.stderr}")
+                        
+                except subprocess.TimeoutExpired:
+                    logger.warning(f"MAVLink configuration timed out on attempt {attempt + 1}")
+                except Exception as e:
+                    logger.warning(f"MAVLink configuration error on attempt {attempt + 1}: {e}")
+                
+                if attempt < 2:  # Don't sleep after the last attempt
+                    time.sleep(5)
+            
+            # If all attempts failed, try a different approach
+            logger.info(f"Trying alternative MAVLink configuration for instance {self.instance_id}...")
             try:
-                logger.info(f"Attempting MAVLink configuration for instance {self.instance_id}...")
-                
-                # Stop any existing MAVLink connections
-                subprocess.run(
-                    ['python3', mavlink_shell, f'udp:127.0.0.1:{self.udp_port}'],
-                    input="mavlink stop-all\n",
-                    text=True,
-                    capture_output=True,
-                    timeout=10
-                )
-                
-                time.sleep(2)
-                
-                # Try to start MAVLink connection
+                # Try without stopping existing connections
                 result = subprocess.run(
                     ['python3', mavlink_shell, f'udp:127.0.0.1:{self.udp_port}'],
-                    input=f"mavlink start -x -u {self.udp_port} -r 4000000 -t 0.0.0.0\n",
+                    input=f"mavlink start -u {self.udp_port} -r 4000000\n",
                     text=True,
                     capture_output=True,
                     timeout=15
                 )
                 
                 if result.returncode == 0:
-                    logger.info(f"✅ MAVLink configured successfully for instance {self.instance_id}")
-                else:
-                    logger.warning(f"⚠️ MAVLink configuration failed for instance {self.instance_id}, but continuing...")
+                    logger.info(f"✅ Alternative MAVLink configuration successful for instance {self.instance_id}")
+                    return True
                     
             except Exception as e:
-                logger.warning(f"MAVLink configuration failed for instance {self.instance_id}: {e}")
+                logger.warning(f"Alternative MAVLink configuration failed: {e}")
             
-            # Always return True - PX4 SITL should work even without explicit MAVLink config
-            logger.info(f"✅ Instance {self.instance_id} setup completed (MAVLink may auto-configure)")
+            logger.warning(f"⚠️ All MAVLink configuration attempts failed for instance {self.instance_id}, but continuing...")
             return True
                 
         except Exception as e:
             logger.error(f"Error in MAVLink setup for instance {self.instance_id}: {e}")
-            # Continue anyway - the instance might still work
             return True
     
     def start(self):
