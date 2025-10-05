@@ -2,18 +2,18 @@
 
 ## What You Have
 
-A **simple, clean web interface** to run PX4 SITL (X500 quadcopter) with MAVLink router for QGroundControl connections on your Azure VM.
+A **powerful multi-instance web interface** to manage multiple PX4 SITL instances with different airframes simultaneously.
 
 ## Files Created
 
 ```
 CLOUDSITLSIM/
-├── app.py                    # Flask web application
-├── sitl_manager.py           # SITL management logic
+├── app_multi.py              # Multi-instance Flask web application
+├── multi_sitl_manager.py     # Multi-instance SITL management logic
 ├── templates/
-│   └── index.html            # Beautiful web interface
+│   └── index_multi.html      # Multi-instance web interface with table
 ├── requirements.txt          # Python dependencies
-├── start.sh                  # Start script
+├── start.sh                  # Start script (uses multi-instance)
 ├── test_setup.sh             # Setup verification
 ├── px4-sitl-web.service      # Systemd service (optional)
 ├── README.md                 # Full documentation
@@ -75,29 +75,37 @@ http://<your-vm-public-ip>:5000
 
 ## Using the Web Interface
 
-1. **Click "Start SITL"** - Wait ~30 seconds
-2. **Note the IP address** displayed
-3. **Open QGroundControl**
-4. **Add TCP connection:**
-   - Host: `<IP from web interface>`
-   - Port: `5760`
-5. **Click Connect**
+1. **Create instances:**
+   - Select airframe from dropdown
+   - Click "Create Instance"
+   - Repeat for multiple instances
+2. **Start instances:**
+   - Click "Start" button for each instance
+   - Wait ~30 seconds for initialization
+3. **Note connection info** in the table
+4. **Open QGroundControl**
+5. **Add TCP connections:**
+   - Host: `<IP from table>`
+   - Port: `<TCP port for that instance>`
+6. **Click Connect**
 
 ## That's It!
 
-The web interface is:
-- ✅ Simple and clean
-- ✅ Shows connection status
-- ✅ Displays public IP automatically
-- ✅ One-click start/stop
-- ✅ Beautiful modern design
+The web interface features:
+- ✅ **Table view** showing all instances
+- ✅ **Multiple airframes** (X500, VTOL, Planes, Rovers)
+- ✅ **Individual control** of each instance
+- ✅ **Real-time status updates**
+- ✅ **Automatic port management**
+- ✅ **Connection info** for each instance
+- ✅ **Bulk operations** (stop all)
 
 ## Troubleshooting
 
 **Web interface won't load:**
 ```bash
 # Check if running
-ps aux | grep "python3 app.py"
+ps aux | grep "python3 app_multi.py"
 
 # Check port
 curl http://localhost:5000
@@ -125,11 +133,12 @@ netstat -tlnp | grep 5760
 ## Stop the Application
 
 **From web interface:**
-- Click "Stop SITL" button
+- Click "Stop" on individual instances
+- Or click "Stop All Instances"
 
 **From terminal:**
 ```bash
-pkill -9 -f "python3 app.py"
+pkill -9 -f "python3 app_multi.py"
 ```
 
 ## Auto-Start on Boot (Optional)
@@ -148,12 +157,13 @@ sudo systemctl start px4-sitl-web
 
 ## Success Checklist
 
-- ✅ Web interface loads
-- ✅ Can click "Start SITL"
-- ✅ Status changes to "Running"
-- ✅ Public IP is displayed
-- ✅ QGC connects successfully
-- ✅ Can see vehicle in QGC
+- ✅ Web interface loads with table
+- ✅ Can create instances with different airframes
+- ✅ Can start/stop individual instances
+- ✅ Status updates in real-time
+- ✅ Connection info displayed for each instance
+- ✅ QGC connects successfully to instances
+- ✅ Can see vehicles in QGC
 
 ---
 

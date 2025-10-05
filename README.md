@@ -1,15 +1,17 @@
-# PX4 SITL Web GUI - X500 Quadcopter
+# PX4 SITL Multi-Instance Web GUI
 
-Simple web interface to run PX4 SITL (X500 quadcopter) with MAVLink router for QGroundControl connections.
+Powerful web interface to manage multiple PX4 SITL instances with different airframes simultaneously.
 
 ## Features
 
-- ✅ Simple web interface
-- ✅ One-click start/stop
-- ✅ X500 quadcopter simulation
-- ✅ MAVLink router for QGC connections
-- ✅ Automatic public IP detection
-- ✅ Clean, modern UI
+- ✅ **Table-based interface** showing all instances
+- ✅ **Multiple instances** with different airframes
+- ✅ **Individual control** - start/stop/remove each instance
+- ✅ **Automatic port management** - no conflicts
+- ✅ **Real-time status updates** every 3 seconds
+- ✅ **QGroundControl connection info** for each instance
+- ✅ **Bulk operations** - stop all instances at once
+- ✅ **Clean, modern UI** with responsive design
 
 ## Prerequisites
 
@@ -38,14 +40,18 @@ Simple web interface to run PX4 SITL (X500 quadcopter) with MAVLink router for Q
    http://<your-vm-ip>:5000
    ```
 
-4. **Click "Start SITL"** and wait ~30 seconds
+4. **Create and start instances:**
+   - Select an airframe from the dropdown
+   - Click "Create Instance"
+   - Click "Start" on the instance
+   - Wait ~30 seconds for initialization
 
 5. **Connect QGroundControl:**
    - Open QGroundControl
    - Settings → Comm Links → Add
    - Type: TCP
-   - Host: `<IP shown in web interface>`
-   - Port: `5760`
+   - Host: `<IP shown in table>`
+   - Port: `<TCP port shown for that instance>`
    - Click Connect
 
 ## How It Works
@@ -59,20 +65,20 @@ Simple web interface to run PX4 SITL (X500 quadcopter) with MAVLink router for Q
 
 ```
 CLOUDSITLSIM/
-├── app.py              # Flask web application
-├── sitl_manager.py     # SITL management logic
+├── app_multi.py           # Multi-instance Flask web application
+├── multi_sitl_manager.py  # Multi-instance SITL management logic
 ├── templates/
-│   └── index.html      # Web interface
-├── requirements.txt    # Python dependencies
-├── start.sh           # Start script
-└── README.md          # This file
+│   └── index_multi.html   # Multi-instance web interface with table
+├── requirements.txt       # Python dependencies
+├── start.sh              # Start script (uses multi-instance)
+└── README.md             # This file
 ```
 
 ## Troubleshooting
 
 ### Port 5000 already in use
 ```bash
-pkill -9 -f "python3 app.py"
+pkill -9 -f "python3 app_multi.py"
 ```
 
 ### SITL won't start
@@ -102,16 +108,18 @@ which mavlink-routerd
 
 ## Stopping
 
-- Click "Stop SITL" in the web interface
+- Click "Stop" on individual instances in the table
+- Or click "Stop All Instances" for bulk stop
 - Or press Ctrl+C in the terminal
-- Or run: `pkill -9 -f "python3 app.py"`
+- Or run: `pkill -9 -f "python3 app_multi.py"`
 
 ## Technical Details
 
-- **UDP Port 14550**: PX4 MAVLink → MAVLink Router
-- **TCP Port 5760**: MAVLink Router → QGroundControl
+- **Automatic Port Allocation**: Each instance gets unique ports
+- **UDP Ports**: 14550, 14560, 14570, etc. (PX4 → MAVLink Router)
+- **TCP Ports**: 5760, 5770, 5780, etc. (MAVLink Router → QGroundControl)
 - **Web Port 5000**: Flask web interface
-- **Aircraft**: X500 Quadcopter
+- **Supported Aircraft**: X500, VTOL, Planes, Rovers, etc.
 - **Simulator**: Gazebo (headless mode)
 
 ## License
