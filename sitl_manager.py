@@ -58,7 +58,7 @@ class SITLManager:
             logger.error("❌ MAVLink router failed to start")
             return False
     
-    def start_px4(self, airframe="gz_standard_vtol"):
+    def start_px4(self, airframe="gz_x500"):
         """Start PX4 SITL"""
         logger.info(f"Starting PX4 SITL ({airframe}, headless)")
         
@@ -122,7 +122,7 @@ class SITLManager:
             logger.error(f"Error configuring MAVLink: {e}")
             return False
     
-    def start(self, airframe="gz_standard_vtol"):
+    def start(self, airframe="gz_x500"):
         """Start the complete SITL system"""
         logger.info("=" * 60)
         logger.info("Starting PX4 SITL + MAVLink Router")

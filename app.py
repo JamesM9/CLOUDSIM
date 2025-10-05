@@ -47,11 +47,11 @@ def api_start():
         
         # Get airframe from request data
         data = request.get_json() or {}
-        airframe = data.get('airframe', 'gz_standard_vtol')
+        airframe = data.get('airframe', 'gz_x500')
         
         # Validate airframe
         valid_airframes = [
-            'gz_standard_vtol', 'gz_rc_cessna', 'gz_advanced_plane',
+            'gz_x500', 'gz_standard_vtol', 'gz_rc_cessna', 'gz_advanced_plane',
             'gz_quadtailsitter', 'gz_tiltrotor', 'gz_rover_differential',
             'gz_rover_ackermann', 'gz_rover_mecanum'
         ]
