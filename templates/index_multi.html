@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PX4 SITL - Multi-Instance Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .add-instance-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .add-instance-form {
+            display: flex;
+            gap: 15px;
+            align-items: end;
+        }
+        
+        .airframe-dropdown {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+        }
+        
+        .airframe-dropdown:focus {
+            outline: none;
+            border-color: #764ba2;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .btn-add {
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-add:hover:not(:disabled) {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40,167,69,0.3);
+        }
+        
+        .btn-add:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .instances-section {
+            margin-top: 30px;
+        }
+        
+        .instances-table-wrapper {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        tbody tr {
+            transition: background-color 0.2s;
+        }
+        
+        tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .status-running {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-running::before {
+            content: '●';
+            color: #28a745;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-stopped {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-stopped::before {
+            content: '●';
+            color: #dc3545;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .connection-info {
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        .connection-info.empty {
+            color: #999;
+            font-style: italic;
+        }
+        
+        .btn-action {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 5px;
+        }
+        
+        .btn-start {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-start:hover:not(:disabled) {
+            background: #218838;
+            transform: translateY(-1px);
+        }
+        
+        .btn-stop {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-stop:hover:not(:disabled) {
+            background: #c82333;
+            transform: translateY(-1px);
+        }
+        
+        .btn-remove {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-remove:hover:not(:disabled) {
+            background: #5a6268;
+            transform: translateY(-1px);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .bulk-controls {
+            background: #e7f3ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+        
+        .bulk-controls h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .bulk-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-bulk {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-bulk-stop {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-bulk-stop:hover {
+            background: #c82333;
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+            font-size: 1.1em;
+        }
+        
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        
+        .instance-count {
+            color: #667eea;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚁 PX4 SITL Multi-Instance Manager</h1>
+        <p class="subtitle">Manage Multiple SITL Instances with Different Airframes</p>
+        
+        <div class="add-instance-section">
+            <h3>Add New Instance</h3>
+            <div class="add-instance-form">
+                <select id="airframeSelect" class="airframe-dropdown">
+                    <option value="gz_x500">X500 Quadcopter</option>
+                    <option value="gz_standard_vtol">Standard VTOL</option>
+                    <option value="gz_rc_cessna">RC Cessna Plane</option>
+                    <option value="gz_advanced_plane">Advanced Plane</option>
+                    <option value="gz_quadtailsitter">Quad Tailsitter VTOL</option>
+                    <option value="gz_tiltrotor">Tiltrotor VTOL</option>
+                    <option value="gz_rover_differential">Differential Rover</option>
+                    <option value="gz_rover_ackermann">Ackermann Rover</option>
+                    <option value="gz_rover_mecanum">Mecanum Rover</option>
+                </select>
+                <button id="addInstanceBtn" class="btn-add" onclick="addInstance()">
+                    ➕ Create Instance
+                </button>
+            </div>
+        </div>
+        
+        <div class="instances-section">
+            <h3>Instances (<span id="instanceCount" class="instance-count">0</span>)</h3>
+            <div class="instances-table-wrapper">
+                <table id="instancesTable">
+                    <thead>
+                        <tr>
+                            <th>Instance ID</th>
+                            <th>Airframe</th>
+                            <th>Status</th>
+                            <th>QGC Connection</th>
+                            <th>UDP Port</th>
+                            <th>TCP Port</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="instancesTableBody">
+                        <tr>
+                            <td colspan="7" class="empty-state">
+                                No instances created yet. Add an instance above to get started.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="bulk-controls">
+            <h3>Bulk Operations</h3>
+            <div class="bulk-buttons">
+                <button class="btn-bulk btn-bulk-stop" onclick="stopAllInstances()">
+                    ⏹️ Stop All Instances
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let instances = {};
+        let publicIP = 'Loading...';
+        let isUpdating = false;
+        
+        function updateInstances() {
+            console.log('[updateInstances] Fetching instances...');
+            fetch('/api/instances')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('[updateInstances] Received data:', data);
+                    instances = data.instances || {};
+                    publicIP = data.public_ip || 'Loading...';
+                    renderInstances();
+                })
+                .catch(error => {
+                    console.error('[updateInstances] Error fetching instances:', error);
+                });
+        }
+        
+        function renderInstances() {
+            console.log('[renderInstances] Rendering instances:', instances);
+            const tableBody = document.getElementById('instancesTableBody');
+            const instanceCount = document.getElementById('instanceCount');
+            
+            const instanceKeys = Object.keys(instances);
+            instanceCount.textContent = instanceKeys.length;
+            
+            if (instanceKeys.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            No instances created yet. Add an instance above to get started.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            let html = '';
+            for (const [instanceId, instance] of Object.entries(instances)) {
+                const statusClass = instance.status === 'running' ? 'status-running' : 'status-stopped';
+                const statusText = instance.status === 'running' ? 'Running' : 'Stopped';
+                const connectionInfo = instance.status === 'running' 
+                    ? `TCP ${publicIP}:${instance.tcp_port}` 
+                    : '—';
+                const connectionClass = instance.status === 'running' ? '' : 'empty';
+                
+                html += `
+                    <tr>
+                        <td><strong>${instanceId}</strong></td>
+                        <td>${instance.airframe}</td>
+                        <td>
+                            <span class="status-indicator ${statusClass}">
+                                ${statusText}
+                            </span>
+                        </td>
+                        <td class="connection-info ${connectionClass}">${connectionInfo}</td>
+                        <td>${instance.udp_port || '—'}</td>
+                        <td>${instance.tcp_port || '—'}</td>
+                        <td>
+                            ${instance.status === 'running' ? 
+                                `<button class="btn-action btn-stop" onclick="stopInstance('${instanceId}')">⏹️ Stop</button>` :
+                                `<button class="btn-action btn-start" onclick="startInstance('${instanceId}')">▶️ Start</button>`
+                            }
+                            <button class="btn-action btn-remove" onclick="removeInstance('${instanceId}')" ${instance.status === 'running' ? 'disabled' : ''}>🗑️ Remove</button>
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            tableBody.innerHTML = html;
+            console.log('[renderInstances] Render complete');
+        }
+        
+        async function addInstance() {
+            const airframeSelect = document.getElementById('airframeSelect');
+            const addBtn = document.getElementById('addInstanceBtn');
+            const selectedAirframe = airframeSelect.value;
+            
+            console.log('[addInstance] Creating instance with airframe:', selectedAirframe);
+            
+            // Disable button and show loading state
+            addBtn.disabled = true;
+            addBtn.textContent = '⏳ Creating...';
+            
+            try {
+                const response = await fetch('/api/instances', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ airframe: selectedAirframe })
+                });
+                
+                const data = await response.json();
+                console.log('[addInstance] Response:', data);
+                
+                if (data.success) {
+                    alert('Instance created successfully!');
+                    // Force immediate update
+                    await updateInstances();
+                    // Wait a bit and update again to ensure it's shown
+                    setTimeout(updateInstances, 500);
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to create instance'));
+                }
+            } catch (error) {
+                console.error('[addInstance] Error:', error);
+                alert('Error: ' + error);
+            } finally {
+                // Re-enable button
+                addBtn.disabled = false;
+                addBtn.textContent = '➕ Create Instance';
+            }
+        }
+        
+        async function startInstance(instanceId) {
+            console.log('[startInstance] Starting instance:', instanceId);
+            try {
+                const response = await fetch(`/api/instances/${instanceId}/start`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Instance started successfully! Wait ~30 seconds for full initialization.');
+                    updateInstances();
+                    // Update again after a delay to catch status changes
+                    setTimeout(updateInstances, 2000);
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to start instance'));
+                }
+            } catch (error) {
+                console.error('[startInstance] Error:', error);
+                alert('Error: ' + error);
+            }
+        }
+        
+        async function stopInstance(instanceId) {
+            console.log('[stopInstance] Stopping instance:', instanceId);
+            try {
+                const response = await fetch(`/api/instances/${instanceId}/stop`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Instance stopped successfully!');
+                    updateInstances();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to stop instance'));
+                }
+            } catch (error) {
+                console.error('[stopInstance] Error:', error);
+                alert('Error: ' + error);
+            }
+        }
+        
+        async function removeInstance(instanceId) {
+            if (!confirm('Are you sure you want to remove this instance? This action cannot be undone.')) {
+                return;
+            }
+            
+            console.log('[removeInstance] Removing instance:', instanceId);
+            try {
+                const response = await fetch(`/api/instances/${instanceId}`, { method: 'DELETE' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Instance removed successfully!');
+                    updateInstances();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to remove instance'));
+                }
+            } catch (error) {
+                console.error('[removeInstance] Error:', error);
+                alert('Error: ' + error);
+            }
+        }
+        
+        async function stopAllInstances() {
+            if (!confirm('Are you sure you want to stop all instances?')) {
+                return;
+            }
+            
+            console.log('[stopAllInstances] Stopping all instances');
+            try {
+                const response = await fetch('/api/instances/stop-all', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('All instances stopped successfully!');
+                    updateInstances();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to stop all instances'));
+                }
+            } catch (error) {
+                console.error('[stopAllInstances] Error:', error);
+                alert('Error: ' + error);
+            }
+        }
+        
+        // Initial update and periodic refresh every 3 seconds
+        console.log('[init] Starting periodic updates');
+        updateInstances();
+        setInterval(updateInstances, 3000);
+    </script>
+</body>
+</html>
