@@ -22,7 +22,7 @@ class PortPool:
     def __init__(self):
         self.udp_base = 14550
         self.tcp_base = 5760
-        self.increment = 10
+        self.increment = 1
         self.used_ports = set()
         self.max_instances = 10  # Limit to prevent resource exhaustion
     

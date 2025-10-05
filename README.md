@@ -116,8 +116,8 @@ which mavlink-routerd
 ## Technical Details
 
 - **Automatic Port Allocation**: Each instance gets unique ports
-- **UDP Ports**: 14550, 14560, 14570, etc. (PX4 → MAVLink Router)
-- **TCP Ports**: 5760, 5770, 5780, etc. (MAVLink Router → QGroundControl)
+- **UDP Ports**: 14550, 14551, 14552, etc. (PX4 → MAVLink Router)
+- **TCP Ports**: 5760, 5761, 5762, etc. (MAVLink Router → QGroundControl)
 - **Web Port 5000**: Flask web interface
 - **Supported Aircraft**: X500, VTOL, Planes, Rovers, etc.
 - **Simulator**: Gazebo (headless mode)
