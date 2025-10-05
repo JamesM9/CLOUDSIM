@@ -1,0 +1,14 @@
+[Unit]
+Description=PX4 SITL Web GUI
+After=network.target
+
+[Service]
+Type=simple
+User=uasop
+WorkingDirectory=/home/uasop/CLOUDSITLSIM
+ExecStart=/usr/bin/python3 /home/uasop/CLOUDSITLSIM/app.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

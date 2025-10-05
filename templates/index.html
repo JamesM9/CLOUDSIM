@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PX4 SITL - X500 Quadcopter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .status {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-running {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-stopped {
+            background: #dc3545;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .info-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .info-box.show {
+            display: block;
+        }
+        
+        .info-item {
+            margin: 10px 0;
+            font-size: 1.1em;
+        }
+        
+        .info-label {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+        
+        .info-value {
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            font-size: 1.2em;
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-start {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-start:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40,167,69,0.3);
+        }
+        
+        .btn-stop {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-stop:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(220,53,69,0.3);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .instructions {
+            background: #e7f3ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+        
+        .instructions h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .instructions ol {
+            margin-left: 20px;
+        }
+        
+        .instructions li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚁 PX4 SITL</h1>
+        <p class="subtitle">X500 Quadcopter Simulator</p>
+        
+        <div class="status">
+            <div>
+                <span class="status-indicator status-stopped" id="statusIndicator"></span>
+                <strong>Status:</strong> <span id="statusText">Stopped</span>
+            </div>
+        </div>
+        
+        <div class="info-box" id="connectionInfo">
+            <h3>🔌 QGroundControl Connection</h3>
+            <div class="info-item">
+                <div class="info-label">Public IP Address</div>
+                <div class="info-value" id="publicIP">Loading...</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Port (TCP)</div>
+                <div class="info-value">5760</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Protocol</div>
+                <div class="info-value">TCP</div>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button class="btn-start" id="startBtn" onclick="startSITL()">
+                ▶️ Start SITL
+            </button>
+            <button class="btn-stop" id="stopBtn" onclick="stopSITL()" disabled>
+                ⏹️ Stop SITL
+            </button>
+        </div>
+        
+        <div class="instructions">
+            <h3>How to Connect QGroundControl</h3>
+            <ol>
+                <li>Click "Start SITL" button above</li>
+                <li>Wait ~30 seconds for startup</li>
+                <li>Open QGroundControl</li>
+                <li>Go to Settings → Comm Links</li>
+                <li>Add new TCP connection</li>
+                <li>Enter the IP address shown above</li>
+                <li>Enter port: 5760</li>
+                <li>Click Connect</li>
+            </ol>
+        </div>
+    </div>
+    
+    <script>
+        function updateStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    const indicator = document.getElementById('statusIndicator');
+                    const statusText = document.getElementById('statusText');
+                    const connectionInfo = document.getElementById('connectionInfo');
+                    const startBtn = document.getElementById('startBtn');
+                    const stopBtn = document.getElementById('stopBtn');
+                    const publicIP = document.getElementById('publicIP');
+                    
+                    if (data.status === 'running') {
+                        indicator.className = 'status-indicator status-running';
+                        statusText.textContent = 'Running';
+                        connectionInfo.classList.add('show');
+                        startBtn.disabled = true;
+                        stopBtn.disabled = false;
+                        publicIP.textContent = data.public_ip || 'Loading...';
+                    } else {
+                        indicator.className = 'status-indicator status-stopped';
+                        statusText.textContent = 'Stopped';
+                        connectionInfo.classList.remove('show');
+                        startBtn.disabled = false;
+                        stopBtn.disabled = true;
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+        
+        function startSITL() {
+            const startBtn = document.getElementById('startBtn');
+            startBtn.disabled = true;
+            startBtn.textContent = '⏳ Starting...';
+            
+            fetch('/api/start', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('SITL started successfully! Wait ~30 seconds for full initialization.');
+                        updateStatus();
+                    } else {
+                        alert('Error: ' + (data.error || 'Failed to start'));
+                        startBtn.disabled = false;
+                        startBtn.textContent = '▶️ Start SITL';
+                    }
+                })
+                .catch(error => {
+                    alert('Error: ' + error);
+                    startBtn.disabled = false;
+                    startBtn.textContent = '▶️ Start SITL';
+                });
+        }
+        
+        function stopSITL() {
+            const stopBtn = document.getElementById('stopBtn');
+            stopBtn.disabled = true;
+            stopBtn.textContent = '⏳ Stopping...';
+            
+            fetch('/api/stop', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('SITL stopped successfully!');
+                        updateStatus();
+                    } else {
+                        alert('Error: ' + (data.error || 'Failed to stop'));
+                    }
+                    stopBtn.disabled = false;
+                    stopBtn.textContent = '⏹️ Stop SITL';
+                })
+                .catch(error => {
+                    alert('Error: ' + error);
+                    stopBtn.disabled = false;
+                    stopBtn.textContent = '⏹️ Stop SITL';
+                });
+        }
+        
+        // Update status every 3 seconds
+        updateStatus();
+        setInterval(updateStatus, 3000);
+    </script>
+</body>
+</html>
