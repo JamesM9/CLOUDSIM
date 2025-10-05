@@ -67,17 +67,37 @@ class SITLInstance:
         self.px4_path = os.path.expanduser("~/PX4-Autopilot")
         
     def cleanup_existing_processes(self):
-        """Clean up any existing processes that might conflict"""
+        """Clean up any existing processes that might conflict for this specific instance"""
         logger.info(f"Cleaning up existing processes for instance {self.instance_id}...")
         
-        # Kill any existing MAVLink routers
-        subprocess.run(['pkill', '-9', 'mavlink-routerd'], stderr=subprocess.DEVNULL)
+        # Only kill processes that might conflict with this specific instance
+        # Don't kill all MAVLink routers - that breaks other instances!
         
-        # Kill any existing PX4 processes
+        # Kill any existing PX4 processes (this is instance-specific)
         subprocess.run(['pkill', '-9', '-f', 'px4.*sitl'], stderr=subprocess.DEVNULL)
         
-        # Kill any existing Gazebo processes
+        # Kill any existing Gazebo processes (this is instance-specific)  
         subprocess.run(['pkill', '-9', 'gz'], stderr=subprocess.DEVNULL)
+        
+        # For MAVLink router, we should check if the port is already in use
+        # and only kill the specific process using that port
+        try:
+            # Check if our target TCP port is in use
+            result = subprocess.run(['lsof', '-ti', f':{self.tcp_port}'], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                # Kill only the process using our specific port
+                pids = result.stdout.strip().split('\n')
+                for pid in pids:
+                    try:
+                        subprocess.run(['kill', '-9', pid], stderr=subprocess.DEVNULL)
+                        logger.info(f"Killed process {pid} using port {self.tcp_port}")
+                    except:
+                        pass
+        except:
+            # Fallback: just continue without killing MAVLink routers
+            logger.info("Could not check for port conflicts, continuing...")
+            pass
         
         time.sleep(2)
     
