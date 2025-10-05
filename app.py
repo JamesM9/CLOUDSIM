@@ -3,7 +3,7 @@
 Simple Flask Web GUI for PX4 SITL
 """
 
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import logging
 import requests
 from sitl_manager import SITLManager
@@ -45,14 +45,29 @@ def api_start():
         if sitl.status == "running":
             return jsonify({"success": False, "error": "Already running"}), 400
         
-        success = sitl.start()
+        # Get airframe from request data
+        data = request.get_json() or {}
+        airframe = data.get('airframe', 'gz_standard_vtol')
+        
+        # Validate airframe
+        valid_airframes = [
+            'gz_standard_vtol', 'gz_rc_cessna', 'gz_advanced_plane',
+            'gz_quadtailsitter', 'gz_tiltrotor', 'gz_rover_differential',
+            'gz_rover_ackermann', 'gz_rover_mecanum'
+        ]
+        
+        if airframe not in valid_airframes:
+            return jsonify({"success": False, "error": f"Invalid airframe: {airframe}"}), 400
+        
+        success = sitl.start(airframe)
         
         if success:
             return jsonify({
                 "success": True,
-                "message": "SITL started successfully",
+                "message": f"SITL started successfully with {airframe}",
                 "public_ip": get_public_ip(),
-                "tcp_port": sitl.tcp_port
+                "tcp_port": sitl.tcp_port,
+                "airframe": airframe
             })
         else:
             return jsonify({"success": False, "error": "Failed to start"}), 500

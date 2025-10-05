@@ -43,6 +43,29 @@
             margin-bottom: 30px;
         }
         
+        .airframe-selection {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .airframe-dropdown {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+            margin-top: 10px;
+        }
+        
+        .airframe-dropdown:focus {
+            outline: none;
+            border-color: #764ba2;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
         .status {
             background: #f8f9fa;
             border-radius: 10px;
@@ -171,12 +194,29 @@
 <body>
     <div class="container">
         <h1>🚁 PX4 SITL</h1>
-        <p class="subtitle">X500 Quadcopter Simulator</p>
+        <p class="subtitle">Multi-Airframe Simulator</p>
+        
+        <div class="airframe-selection">
+            <label for="airframeSelect"><strong>Select Airframe:</strong></label>
+            <select id="airframeSelect" class="airframe-dropdown">
+                <option value="gz_standard_vtol">Standard VTOL</option>
+                <option value="gz_rc_cessna">RC Cessna Plane</option>
+                <option value="gz_advanced_plane">Advanced Plane</option>
+                <option value="gz_quadtailsitter">Quad Tailsitter VTOL</option>
+                <option value="gz_tiltrotor">Tiltrotor VTOL</option>
+                <option value="gz_rover_differential">Differential Rover</option>
+                <option value="gz_rover_ackermann">Ackermann Rover</option>
+                <option value="gz_rover_mecanum">Mecanum Rover</option>
+            </select>
+        </div>
         
         <div class="status">
             <div>
                 <span class="status-indicator status-stopped" id="statusIndicator"></span>
                 <strong>Status:</strong> <span id="statusText">Stopped</span>
+            </div>
+            <div id="airframeInfo" style="margin-top: 10px; display: none;">
+                <strong>Current Airframe:</strong> <span id="currentAirframe">-</span>
             </div>
         </div>
         
@@ -228,6 +268,8 @@
                     const indicator = document.getElementById('statusIndicator');
                     const statusText = document.getElementById('statusText');
                     const connectionInfo = document.getElementById('connectionInfo');
+                    const airframeInfo = document.getElementById('airframeInfo');
+                    const currentAirframe = document.getElementById('currentAirframe');
                     const startBtn = document.getElementById('startBtn');
                     const stopBtn = document.getElementById('stopBtn');
                     const publicIP = document.getElementById('publicIP');
@@ -236,6 +278,10 @@
                         indicator.className = 'status-indicator status-running';
                         statusText.textContent = 'Running';
                         connectionInfo.classList.add('show');
+                        airframeInfo.style.display = 'block';
+                        if (data.airframe) {
+                            currentAirframe.textContent = data.airframe;
+                        }
                         startBtn.disabled = true;
                         stopBtn.disabled = false;
                         publicIP.textContent = data.public_ip || 'Loading...';
@@ -243,6 +289,7 @@
                         indicator.className = 'status-indicator status-stopped';
                         statusText.textContent = 'Stopped';
                         connectionInfo.classList.remove('show');
+                        airframeInfo.style.display = 'none';
                         startBtn.disabled = false;
                         stopBtn.disabled = true;
                     }
@@ -252,10 +299,19 @@
         
         function startSITL() {
             const startBtn = document.getElementById('startBtn');
+            const airframeSelect = document.getElementById('airframeSelect');
+            const selectedAirframe = airframeSelect.value;
+            
             startBtn.disabled = true;
             startBtn.textContent = '⏳ Starting...';
             
-            fetch('/api/start', { method: 'POST' })
+            fetch('/api/start', { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ airframe: selectedAirframe })
+            })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {

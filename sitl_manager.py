@@ -22,6 +22,7 @@ class SITLManager:
         self.status = "stopped"
         self.udp_port = 14550
         self.tcp_port = 5760
+        self.current_airframe = None
         
     def cleanup(self):
         """Kill any existing processes"""
@@ -57,11 +58,11 @@ class SITLManager:
             logger.error("❌ MAVLink router failed to start")
             return False
     
-    def start_px4(self):
+    def start_px4(self, airframe="gz_standard_vtol"):
         """Start PX4 SITL"""
-        logger.info("Starting PX4 SITL (X500 quadcopter, headless)")
+        logger.info(f"Starting PX4 SITL ({airframe}, headless)")
         
-        cmd = f"cd {self.px4_path} && HEADLESS=1 make px4_sitl gz_x500"
+        cmd = f"cd {self.px4_path} && HEADLESS=1 make px4_sitl {airframe}"
         
         self.px4_process = subprocess.Popen(
             cmd,
@@ -121,7 +122,7 @@ class SITLManager:
             logger.error(f"Error configuring MAVLink: {e}")
             return False
     
-    def start(self):
+    def start(self, airframe="gz_standard_vtol"):
         """Start the complete SITL system"""
         logger.info("=" * 60)
         logger.info("Starting PX4 SITL + MAVLink Router")
@@ -136,13 +137,14 @@ class SITLManager:
                 raise Exception("Failed to start MAVLink router")
             
             # Step 3: Start PX4
-            if not self.start_px4():
+            if not self.start_px4(airframe):
                 raise Exception("Failed to start PX4 SITL")
             
             # Step 4: Configure MAVLink
             self.configure_mavlink()
             
             self.status = "running"
+            self.current_airframe = airframe
             logger.info("=" * 60)
             logger.info("✅ SITL System Started Successfully!")
             logger.info(f"🔌 QGC Connection: TCP @ <your-vm-ip>:{self.tcp_port}")
@@ -173,6 +175,7 @@ class SITLManager:
         
         self.cleanup()
         self.status = "stopped"
+        self.current_airframe = None
         logger.info("✅ SITL system stopped")
     
     def get_status(self):
@@ -180,7 +183,8 @@ class SITLManager:
         return {
             "status": self.status,
             "tcp_port": self.tcp_port,
-            "udp_port": self.udp_port
+            "udp_port": self.udp_port,
+            "airframe": self.current_airframe
         }
 
 
