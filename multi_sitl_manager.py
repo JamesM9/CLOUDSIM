@@ -52,6 +52,111 @@ class PortPool:
             logger.warning(f"Attempted to release unallocated ports: UDP {udp_port}, TCP {tcp_port}")
 
 
+class MAVLinkRouterManager:
+    """Manages a single MAVLink router for all instances"""
+    
+    def __init__(self):
+        self.config_file = "/tmp/mavlink-router.conf"
+        self.router_process = None
+        self.active_instances = {}  # instance_id -> (udp_port, tcp_port)
+        
+    def generate_config(self):
+        """Generate MAVLink router config file for all active instances"""
+        config_content = """[General]
+TcpServerPort=14550
+ReportStats=false
+MavlinkDialect=auto
+Log=/tmp/mavlink-router.log
+
+"""
+        
+        # Add endpoint for each active instance
+        for instance_id, (udp_port, tcp_port) in self.active_instances.items():
+            config_content += f"""[UartEndpoint sitl_{tcp_port}]
+Device = tcp:127.0.0.1:{tcp_port}
+
+"""
+        
+        # Write config file
+        with open(self.config_file, 'w') as f:
+            f.write(config_content)
+        
+        logger.info(f"Generated MAVLink router config for {len(self.active_instances)} instances")
+    
+    def start_router(self):
+        """Start the MAVLink router with current config"""
+        if not self.active_instances:
+            logger.info("No instances active, skipping MAVLink router start")
+            return True
+        
+        # Stop existing router if running
+        self.stop_router()
+        
+        # Generate config
+        self.generate_config()
+        
+        # Start router
+        cmd = [
+            'mavlink-routerd',
+            '-c', self.config_file,
+            '-v'
+        ]
+        
+        logger.info(f"Starting MAVLink router with config: {self.config_file}")
+        
+        self.router_process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        
+        time.sleep(2)
+        
+        if self.router_process.poll() is None:
+            logger.info("✅ MAVLink router started successfully")
+            return True
+        else:
+            logger.error("❌ MAVLink router failed to start")
+            return False
+    
+    def stop_router(self):
+        """Stop the MAVLink router"""
+        if self.router_process:
+            try:
+                self.router_process.terminate()
+                self.router_process.wait(timeout=5)
+            except:
+                try:
+                    self.router_process.kill()
+                except:
+                    pass
+            self.router_process = None
+            logger.info("MAVLink router stopped")
+    
+    def add_instance(self, instance_id, udp_port, tcp_port):
+        """Add an instance to the router"""
+        self.active_instances[instance_id] = (udp_port, tcp_port)
+        logger.info(f"Added instance {instance_id} to router: UDP {udp_port} -> TCP {tcp_port}")
+        
+        # Restart router with new config
+        if self.active_instances:
+            return self.start_router()
+        return True
+    
+    def remove_instance(self, instance_id):
+        """Remove an instance from the router"""
+        if instance_id in self.active_instances:
+            udp_port, tcp_port = self.active_instances.pop(instance_id)
+            logger.info(f"Removed instance {instance_id} from router: UDP {udp_port} -> TCP {tcp_port}")
+            
+            # Restart router with updated config
+            if self.active_instances:
+                return self.start_router()
+            else:
+                self.stop_router()
+        return True
+
+
 class SITLInstance:
     """Represents a single SITL instance"""
     
@@ -102,33 +207,11 @@ class SITLInstance:
         time.sleep(2)
     
     def start_mavlink_router(self):
-        """Start MAVLink router for this instance"""
-        logger.info(f"Starting MAVLink router for instance {self.instance_id}: UDP {self.udp_port} -> TCP {self.tcp_port}")
-        
-        # Clean up any existing processes first
-        self.cleanup_existing_processes()
-        
-        cmd = [
-            'mavlink-routerd',
-            f'0.0.0.0:{self.udp_port}',
-            '-t', str(self.tcp_port),
-            '-v'
-        ]
-        
-        self.mavlink_process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        
-        time.sleep(2)
-        
-        if self.mavlink_process.poll() is None:
-            logger.info(f"✅ MAVLink router started for instance {self.instance_id}")
-            return True
-        else:
-            logger.error(f"❌ MAVLink router failed to start for instance {self.instance_id}")
-            return False
+        """MAVLink router is now handled centrally"""
+        # The router is managed centrally by MultiSITLManager
+        # We just need to ensure PX4 sends data to the correct UDP port
+        logger.info(f"Instance {self.instance_id} will send MAVLink to UDP {self.udp_port}")
+        return True
     
     def start_px4(self):
         """Start PX4 SITL for this instance"""
@@ -188,10 +271,10 @@ class SITLInstance:
                         time.sleep(5)
                         continue
                     
-                    # Now configure MAVLink with correct target address
+                    # Now configure MAVLink to send to UDP port (router will handle TCP forwarding)
                     result = subprocess.run(
                         ['python3', mavlink_shell, f'udp:127.0.0.1:{self.udp_port}'],
-                        input=f"mavlink start -x -u {self.udp_port} -r 4000000 -t 127.0.0.1\n",
+                        input=f"mavlink start -x -u {self.udp_port} -r 4000000\n",
                         text=True,
                         capture_output=True,
                         timeout=20
@@ -318,6 +401,7 @@ class MultiSITLManager:
     def __init__(self):
         self.instances = {}
         self.port_pool = PortPool()
+        self.router_manager = MAVLinkRouterManager()
         self.next_instance_id = 1
     
     def create_instance(self, airframe="gz_x500"):
@@ -333,6 +417,9 @@ class MultiSITLManager:
             # Store instance
             self.instances[instance_id] = instance
             self.next_instance_id += 1
+            
+            # Add to router manager
+            self.router_manager.add_instance(instance_id, udp_port, tcp_port)
             
             logger.info(f"Created SITL instance {instance_id} with airframe {airframe}")
             return instance_id
@@ -376,6 +463,9 @@ class MultiSITLManager:
             logger.error(f"Cannot remove running instance {instance_id}")
             return False
         
+        # Remove from router manager
+        self.router_manager.remove_instance(instance_id)
+        
         # Release ports
         self.port_pool.release_ports(instance.udp_port, instance.tcp_port)
         
@@ -392,6 +482,9 @@ class MultiSITLManager:
             if instance.status == "running":
                 instance.stop()
                 self.port_pool.release_ports(instance.udp_port, instance.tcp_port)
+        
+        # Stop the router
+        self.router_manager.stop_router()
         
         logger.info("All SITL instances stopped")
     
